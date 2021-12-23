@@ -357,15 +357,6 @@ END:
     return ret;
 }
 
-int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
-                      unsigned char *Src, unsigned long lenSrc,
-                      unsigned char *UserID, unsigned long lenUID,
-                      mp_int *mp_a, mp_int *mp_b,
-                      mp_int *mp_Xg, mp_int *mp_Yg,
-                      mp_int *mp_XA, mp_int *mp_YA)
-{
-}
-
 int Ecc_point_is_on_curve(mp_int *mp_X, mp_int *mp_Y,
                           mp_int *mp_a, mp_int *mp_b, mp_int *mp_p)
 {
@@ -415,6 +406,191 @@ int Ecc_point_is_on_curve(mp_int *mp_X, mp_int *mp_Y,
 
 END:
     mp_clear_multi(&left, &right, &mp_tmp, &mp_tmp2, NULL);
+    return ret;
+}
+
+int hexStr2unsignedStr(char *src, unsigned long lsrc, int flag,
+                       unsigned char *out, unsigned long *lout)
+{
+    if ((0 == flag && 0 != lsrc % 2) || (0 != flag && 0 != lsrc % 3) || NULL == src || NULL == out)
+    {
+        return ERR_HEX2BYTE_PARAM_ERROR; //param err
+    }
+
+    int j = 0; //index of out buff
+    if (0 == flag)
+    {
+        for (int i = 0; i < lsrc; i += 2)
+        {
+            int tmp = 0;
+            int HIGH_HALF_BYTE = 0;
+            int LOW_HALF_BYTE = 0;
+            if (src[i] >= 0x30 && src[i] <= 0x39)
+            {
+                HIGH_HALF_BYTE = src[i] - 0x30;
+            }
+            else if (src[i] >= 0x41 && src[i] <= 0x46)
+            {
+                HIGH_HALF_BYTE = src[i] - 0x37;
+            }
+            else if (src[i] >= 0x61 && src[i] <= 0x66)
+            {
+                HIGH_HALF_BYTE = src[i] - 0x57;
+            }
+            else if (src[i] == 0x20)
+            {
+                HIGH_HALF_BYTE = 0x00;
+            }
+            else
+            {
+                return ERR_HEX2BYTE_INVALID_DATA;
+            }
+
+            if (src[i + 1] >= 0x30 && src[i + 1] <= 0x39)
+            {
+                LOW_HALF_BYTE = src[i + 1] - 0x30;
+            }
+            else if (src[i + 1] >= 0x41 && src[i + 1] <= 0x46)
+            {
+                LOW_HALF_BYTE = src[i + 1] - 0x37;
+            }
+            else if (src[i + 1] >= 0x61 && src[i + 1] <= 0x66)
+            {
+                LOW_HALF_BYTE = src[i + 1] - 0x57;
+            }
+            else if (src[i + 1] == 0x20)
+            {
+                LOW_HALF_BYTE = 0x00;
+            }
+            else
+            {
+                return ERR_HEX2BYTE_INVALID_DATA;
+            }
+
+            tmp = (HIGH_HALF_BYTE << 4) + LOW_HALF_BYTE;
+            out[j] = tmp;
+            j++;
+        }
+    }
+    else
+    {
+        for (int i = 0; i < lsrc; i += 3)
+        {
+            int tmp = 0;
+            int HIGH_HALF_BYTE = 0;
+            int LOW_HALF_BYTE = 0;
+            if ((i + 2 <= lsrc) && (src[i + 2] != flag))
+            {
+                return ERR_HEX2BYTE_BEYOND_RANGE;
+            }
+
+            if (src[i] >= 0x30 && src[i] <= 0x39)
+            {
+                HIGH_HALF_BYTE = src[i] - 0x30;
+            }
+            else if (src[i] >= 0x41 && src[i] <= 0x46)
+            {
+                HIGH_HALF_BYTE = src[i] - 0x37;
+            }
+            else if (src[i] >= 0x61 && src[i] <= 0x66)
+            {
+                HIGH_HALF_BYTE = src[i] - 0x57;
+            }
+            else
+            {
+                return ERR_HEX2BYTE_INVALID_DATA;
+            }
+
+            if (src[i + 1] >= 0x30 && src[i + 1] <= 0x39)
+            {
+                LOW_HALF_BYTE = src[i + 1] - 0x30;
+            }
+            else if (src[i + 1] >= 0x41 && src[i + 1] <= 0x46)
+            {
+                LOW_HALF_BYTE = src[i + 1] - 0x37;
+            }
+            else if (src[i + 1] >= 0x61 && src[i + 1] <= 0x66)
+            {
+                LOW_HALF_BYTE = src[i + 1] - 0x57;
+            }
+            else
+            {
+                return ERR_HEX2BYTE_INVALID_DATA;
+            }
+
+            tmp = (HIGH_HALF_BYTE << 4) + LOW_HALF_BYTE;
+            out[j] = tmp;
+            j++;
+        }
+    }
+
+    *lout = j;
+    return 0;
+}
+
+int Mp_Int2Byte(unsigned char *tar, unsigned long *lenTar, mp_int *mp_src)
+{
+    int ret = 0;
+    char buff[MAX_STRLEN] = {0};
+    char tmp[MAX_STRLEN] = {0};
+    int lenBuff = MAX_STRLEN;
+    ret = mp_toradix(mp_src, buff, 16);
+    CHECK_RET(ret);
+
+    lenBuff = strlen(buff);
+    if (0 != lenBuff % 2)
+    {
+        tmp[0] = 0x30;
+        memcpy(tmp + 1, buff, lenBuff);
+        memset(buff, 0x00, sizeof(buff));
+        memcpy(buff, tmp, lenBuff + 1);
+        lenBuff += 1;
+    }
+    ret = hexStr2unsignedStr(buff, lenBuff, 0, tar, lenTar);
+
+END:
+    return ret;
+}
+
+int Byte2Mp_Int(mp_int *mp_tar, unsigned char *src_byte, unsigned long lenSrc)
+{
+    char *src_strbuff = NULL;
+    src_strbuff = new char[lenSrc * 2 + MAX_STRLEN];
+    if (NULL == src_strbuff)
+    {
+        return ERR_MEM_ALLOC;
+    }
+    memset(src_strbuff, 0x00, lenSrc * 2 + MAX_STRLEN);
+    int j = 0, ret = 0;
+    for (int i = 0; i < lenSrc; i++)
+    {
+        char tmp = src_byte[i] >> 4;
+        if (tmp >= 0 && tmp <= 9)
+        {
+            src_strbuff[j] = tmp + 0x30;
+        }
+        else
+        {
+            src_strbuff[j] = tmp + 0x37;
+        }
+        tmp = src_byte[i] & 0x0f;
+        if (tmp >= 0 && tmp <= 9)
+        {
+            src_strbuff[j + 1] = tmp + 0x30;
+        }
+        else
+        {
+            src_strbuff[j + 1] = tmp + 0x37;
+        }
+        j += 2;
+    }
+    src_strbuff[j] = 0;
+    ret = mp_read_radix(mp_tar, src_strbuff, 16);
+
+    if (NULL != src_strbuff)
+    {
+        delete src_strbuff;
+    }
     return ret;
 }
 
@@ -512,6 +688,125 @@ int KDF(unsigned char *kdfOutBuff, unsigned char *Z_in, unsigned long ulZlen, un
     return ret;
 }
 
+int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
+                      unsigned char *Src, unsigned long lenSrc,
+                      unsigned char *UserID, unsigned long lenUID,
+                      mp_int *mp_a, mp_int *mp_b,
+                      mp_int *mp_Xg, mp_int *mp_Yg,
+                      mp_int *mp_XA, mp_int *mp_YA)
+{
+    int ret = 0;
+    if (NULL == Src || 0 == lenSrc || NULL == UserID || 0 == lenUID || 8000 < lenUID)
+    {
+        return ERR_PARAM;
+    }
+    if (NULL == dgst)
+    {
+        *LenDgst = 32;
+        return 0;
+    }
+
+#ifdef _DEBUG
+    MP_print_Space;
+    printf("...params are...\n");
+    printf("a=");
+    MP_print(mp_a);
+    printf("b=");
+    MP_print(mp_b);
+    printf("Xg=");
+    MP_print(mp_Xg);
+    printf("Yg=");
+    MP_print(mp_Yg);
+    printf("XA=");
+    MP_print(mp_XA);
+    printf("YA=");
+    MP_print(mp_YA);
+#endif
+    unsigned char ZA[32] = {0};
+    unsigned char *pM_A = NULL;
+    unsigned char *ZA_SRC_Buff = NULL;
+    unsigned long lenZA_SRC = 0;
+    unsigned char ENTL_buf[10] = {0};
+    unsigned long Len_ENTL_buf = 0;
+    char tmp[10] = {0};
+    int tmplen = 0;
+    unsigned char uzParam_A[MAX_STRLEN] = {0};
+    unsigned long lenParamA = MAX_STRLEN;
+    unsigned char uzParam_B[MAX_STRLEN] = {0};
+    unsigned long lenParamB = MAX_STRLEN;
+    unsigned char uzParam_Xg[MAX_STRLEN] = {0};
+    unsigned long lenParamXg = MAX_STRLEN;
+    unsigned char uzParam_Yg[MAX_STRLEN] = {0};
+    unsigned long lenParamYg = MAX_STRLEN;
+    unsigned char uzParam_XA[MAX_STRLEN] = {0};
+    unsigned long lenParamXA = MAX_STRLEN;
+    unsigned char uzParam_YA[MAX_STRLEN] = {0};
+    unsigned long lenParamYA = MAX_STRLEN;
+
+    Mp_Int2Byte(uzParam_A, &lenParamA, mp_a);
+    Mp_Int2Byte(uzParam_B, &lenParamB, mp_b);
+    Mp_Int2Byte(uzParam_Xg, &lenParamXg, mp_Xg);
+    Mp_Int2Byte(uzParam_Yg, &lenParamYg, mp_Yg);
+    Mp_Int2Byte(uzParam_XA, &lenParamXA, mp_XA);
+    Mp_Int2Byte(uzParam_YA, &lenParamYA, mp_YA);
+
+    sprintf(tmp, "%4x", lenUID * 8);
+    tmplen = strlen(tmp);
+    ret = hexStr2unsignedStr(tmp, tmplen, 0, ENTL_buf, &Len_ENTL_buf);
+    if (ret)
+        goto END;
+
+    lenZA_SRC = Len_ENTL_buf + lenUID + lenParamA + lenParamB + lenParamXg + lenParamYg + lenParamXA + lenParamYA;
+    ZA_SRC_Buff = new unsigned char[lenZA_SRC + MAX_STRLEN];
+    if (NULL == ZA_SRC_Buff)
+    {
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+    memset(ZA_SRC_Buff, 0x00, sizeof(ZA_SRC_Buff));
+    memcpy(ZA_SRC_Buff, ENTL_buf, Len_ENTL_buf);
+    memcpy(ZA_SRC_Buff + Len_ENTL_buf, UserID, lenUID);
+    memcpy(ZA_SRC_Buff + Len_ENTL_buf + lenUID, uzParam_A, lenParamA);
+    memcpy(ZA_SRC_Buff + Len_ENTL_buf + lenUID + lenParamA, uzParam_B, lenParamB);
+    memcpy(ZA_SRC_Buff + Len_ENTL_buf + lenUID + lenParamA + lenParamB, uzParam_Xg, lenParamXg);
+    memcpy(ZA_SRC_Buff + Len_ENTL_buf + lenUID + lenParamA + lenParamB + lenParamXg, uzParam_Yg, lenParamYg);
+    memcpy(ZA_SRC_Buff + Len_ENTL_buf + lenUID + lenParamA + lenParamB + lenParamXg + lenParamYg, uzParam_XA, lenParamXA);
+    memcpy(ZA_SRC_Buff + Len_ENTL_buf + lenUID + lenParamA + lenParamB + lenParamXg + lenParamYg + lenParamXA, uzParam_YA, lenParamYA);
+
+    sm3(ZA_SRC_Buff, lenZA_SRC, ZA);
+    pM_A = new unsigned char[32 + lenSrc + MAX_STRLEN];
+    if (NULL == pM_A)
+    {
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+#ifdef _DEBUG
+    printf("...Z value is:\n");
+    BYTE_print(ZA, 32);
+#endif
+    memset(pM_A, 0x00, 32 + lenSrc + MAX_STRLEN);
+    memcpy(pM_A, ZA, 32);
+    memcpy(pM_A + 32, Src, lenSrc);
+    sm3(pM_A, 32 + lenSrc, dgst);
+    *LenDgst = 32;
+    ret = 0;
+#ifdef _DEBUG
+    printf("...M value is:\n");
+    BYTE_print(dgst, 32);
+#endif
+
+END:
+    if (NULL != pM_A)
+    {
+        delete[] pM_A;
+    }
+    if (NULL != ZA_SRC_Buff)
+    {
+        delete[] ZA_SRC_Buff;
+    }
+    return ret;
+}
+
 int BYTE_POINT_is_on_curve(unsigned char *pubkey_XY, unsigned long ulPubXYLen)
 {
     if (NULL == pubkey_XY || 64 != ulPubXYLen)
@@ -591,5 +886,464 @@ int BYTE_Point_mul(unsigned char k[32], unsigned char newPoint[64])
 
 END:
     mp_clear_multi(&mp_a, &mp_p, &mp_Xg, &mp_Yg, &mp_k, &mp_ret_x, &mp_ret_y, NULL);
+    return ret;
+}
+
+int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned char *plain, unsigned long plainLen,
+                  unsigned char *szPubkey_XY, unsigned long ul_PubkXY_len)
+{
+    if (NULL == plain || 0 == plainLen || NULL == szPubkey_XY || 64 != ul_PubkXY_len)
+    {
+        return ERR_PARAM;
+    }
+
+    //1. initialize the buffer variable
+    unsigned char tmpX2Buff[100] = {0};
+    unsigned long tmpX2Len = 100;
+    unsigned char tmpY2Buff[100] = {0};
+    unsigned long tmpY2Len = 100;
+
+    unsigned char *ptmp = NULL;
+    unsigned char *t = NULL; //KDF结果
+
+    unsigned char C1[100] = {0};
+    unsigned long C1_len = 100;
+
+    unsigned char *C2 = NULL;
+    unsigned long C2_len = 100;
+
+    unsigned char C3[32] = {0};
+
+    unsigned char tmpBuff[100] = {0};
+    unsigned long ulTmpBuffLen = 100;
+    unsigned long ulTmpBuffLen2 = 100;
+
+    //2. initialize the mp_int variable
+    mp_int mp_rand_k;
+    mp_init_set(&mp_rand_k, 1);
+
+    mp_int mp_a, mp_b, mp_n, mp_p,
+        mp_Xg, mp_Yg, mp_XB, mp_YB,
+        mp_dgst, mp_x1, mp_y1, mp_x2, mp_y2;
+
+    mp_init_multi(&mp_a, &mp_b, &mp_n, &mp_p,
+                  &mp_Xg, &mp_Yg, &mp_XB, &mp_YB,
+                  &mp_dgst, &mp_x1, &mp_y1, &mp_x2, &mp_y2, NULL);
+
+    //3.set parameter of the curve
+    int ret = 0;
+    int iter = 0;
+
+    ret = mp_read_radix(&mp_a, (char *)param_a, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_b, (char *)param_b, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_n, (char *)param_n, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_p, (char *)param_p, 16);
+    CHECK_RET(ret);
+
+    ret = mp_read_radix(&mp_Xg, (char *)Xg, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_Yg, (char *)Yg, 16);
+    CHECK_RET(ret);
+
+    //4.initialize the public key
+    ret = Byte2Mp_Int(&mp_XB, szPubkey_XY, 32);
+    CHECK_RET(ret);
+    ret = Byte2Mp_Int(&mp_YB, szPubkey_XY + 32, 32);
+    CHECK_RET(ret);
+
+    do
+    {
+        //5.generate rand k
+        ret = genRand_k(&mp_rand_k, &mp_n);
+        CHECK_RET(ret);
+
+        //6. compute C1 = [k]G = (x1,y1)
+        ret = Ecc_point_mul(&mp_x1, &mp_y1, &mp_Xg, &mp_Yg, &mp_rand_k,
+                            &mp_a, &mp_p);
+        CHECK_RET(ret);
+
+#ifdef _DEBUG
+        MP_print_Space;
+        printf("x1 = ");
+        MP_printf(&mp_x1);
+        printf("y1 = ");
+        MP_printf(&mp_y1);
+#endif //_DEBUG
+
+        //7. push (x1,y1) into C1
+        C1[0] = 0x04;
+        Mp_Int2Byte(tmpBuff, &ulTmpBuffLen, &mp_x1);
+        memcpy(C1 + 1, tmpBuff, ulTmpBuffLen);
+        Mp_Int2Byte(tmpBuff, &ulTmpBuffLen2, &mp_y1);
+        memcpy(C1 + ulTmpBuffLen, tmpBuff, ulTmpBuffLen2);
+        C1_len = 1 + ulTmpBuffLen + ulTmpBuffLen2;
+
+#ifdef _DEBUG
+        MP_print_Space;
+        printf("C1 = ");
+        BYTE_print(C1, C1_len);
+#endif //_DEBUG
+
+        //8. compute [k]PukeyB = [k](XB,YB) = (x2,y2)
+        ret = Ecc_point_mul(&mp_x2, &mp_y2, &mp_XB, &mp_YB, &mp_rand_k,
+                            &mp_a, &mp_p);
+        CHECK_RET(ret);
+
+#ifdef _DEBUG
+        MP_print_Space;
+        printf("x2 = ");
+        MP_printf(&mp_x2);
+        printf("y2 = ");
+        MP_printf(&mp_y2);
+#endif //_DEBUG
+
+        //9.compute t = KDF(x2 // y2, klen)
+
+        //9.1 transform the mp_int into byte
+        ret = Mp_Int2Byte(tmpX2Buff, &tmpX2Len, &mp_x2);
+        CHECK_RET(ret);
+        ret = Mp_Int2Byte(tmpY2Buff, &tmpY2Len, &mp_y2);
+        CHECK_RET(ret);
+        ptmp = new unsigned char[tmpX2Len * 3];
+        if (NULL == ptmp)
+        {
+            ret = ERR_MEM_ALLOC;
+            goto END;
+        }
+        memset(ptmp, 0x00, tmpX2Len * 3);
+        memcpy(ptmp, tmpX2Buff, tmpX2Len);
+        memcpy(ptmp + tmpX2Len, tmpY2Buff, tmpY2Len);
+
+        //9.2 initialize the output variable
+        t = new unsigned char[plainLen + 10];
+        if (NULL == t)
+        {
+            ret = ERR_MEM_ALLOC;
+            goto END;
+        }
+        memset(t, 0x00, plainLen + 10);
+
+        //9.3 call the function KDF
+        ret = KDF(t, ptmp, tmpX2Len + tmpY2Len, plainLen);
+        CHECK_RET(ret);
+
+#ifdef _DEBUG
+        MP_print_Space;
+        printf("KDF t = ");
+        BYTE_print(pout, plainLen);
+#endif //_DEBUG
+
+        //10. check if t == 0
+        for (iter = 0; iter < plainLen; ++iter)
+        {
+            if (t[iter] != 0)
+                break;
+        }
+        if (plainLen == iter)
+            continue;
+        else
+            break;
+
+    } while (1);
+
+    //11. compute C2 = M ^ t
+    C2 = new unsigned char[plainLen + 10];
+    if (NULL == C2)
+    {
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+    memset(C2, 0x00, plainLen + 10);
+
+    for (iter = 0; iter < plainLen; ++iter)
+    {
+        C2[iter] = plain[iter] ^ t[iter];
+    }
+    C2_len = plainLen;
+
+#ifdef _DEBUG
+    MP_print_Space;
+    printf("C2 = ");
+    BYTE_print(C2, C2_len);
+#endif // _DEBUG
+
+    //12. compute C3 = HASH(x2 // M // y2)
+    if (ptmp)
+    {
+        delete[] ptmp;
+    }
+    ptmp = new unsigned char[plainLen + tmpX2Len + tmpY2Len + 100];
+    if (NULL == ptmp)
+    {
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+    memset(ptmp, 0x00, plainLen + tmpX2Len + tmpY2Len + 100);
+    memcpy(ptmp, tmpX2Buff, tmpX2Len);
+    memcpy(ptmp + tmpX2Len, plain, plainLen);
+    memcpy(ptmp + tmpX2Len + plainLen, tmpY2Buff, tmpY2Len);
+
+    sm3(ptmp, tmpX2Len + plainLen + tmpY2Len, C3);
+
+#ifdef _DEBUG
+    MP_print_Space;
+    printf("C3 = ");
+    BYTE_print(C3, 32);
+#endif //_DEBUG
+
+    //set C = C1 // C2 // C3
+    if (NULL == encData)
+    {
+        *ulEncDataLen = 32 + C2_len + C1_len;
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+
+    if (*ulEncDataLen < 32 + C2_len + C1_len)
+    {
+        *ulEncDataLen = 32 + C2_len + C1_len;
+        ret = ERR_MEM_LOW;
+        goto END;
+    }
+
+    memcpy(encData, C1, C1_len);
+    memcpy(encData + C1_len, C2, C2_len);
+    memcpy(encData + C1_len + C2_len, C3, 32);
+    *ulEncDataLen = 32 + C2_len + C1_len;
+
+#ifdef _DEBUG
+    MP_print_Space;
+    printf("C = ");
+    BYTE_print(encData, *ulEncDataLen);
+#endif //_DEBUG
+
+    ret = 0;
+END:
+    if (ptmp)
+    {
+        delete[] ptmp;
+    }
+    if (t)
+    {
+        delete[] t;
+    }
+    if (C2)
+    {
+        delete[] C2;
+    }
+    mp_clear_multi(&mp_a, &mp_b, &mp_n, &mp_p,
+                   &mp_Xg, &mp_Yg, &mp_XB, &mp_YB,
+                   &mp_dgst, &mp_x1, &mp_y1, &mp_x2, &mp_y2, &mp_rand_k, NULL);
+    return ret;
+}
+
+int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned char *input, unsigned long inlen,
+                  unsigned char *pri_dA, unsigned long ulPri_dALen)
+{
+    //presume that the input data is:
+    //[C1->65 Byte][C2->Unknown length][C3->32 Byte]
+    if (NULL == input || 98 > inlen || NULL == pri_dA || 0 == ulPri_dALen)
+    {
+        return ERR_PARAM;
+    }
+
+    //1. declare the local variable
+    unsigned char C3[32] = {0};
+    unsigned char dgstC3[32] = {0};
+    unsigned char *pC2 = NULL;
+    unsigned char *pout = NULL;
+    unsigned char tmpX2Buff[100] = {0};
+    unsigned long tmpX2Len = 100;
+    unsigned char tmpY2Buff[100] = {0};
+    unsigned long tmpY2Len = 100;
+    unsigned char *ptmp = NULL;
+    unsigned char *p = NULL;
+    int C2_len = inlen - 65 - 32;
+    int ret = 0;
+    int iter = 0;
+
+    //2. declare the mp_int variable
+    mp_int mp_pri_dA, mp_x1, mp_y1, mp_x2, mp_y2,
+        mp_Xg, mp_Yg, mp_a, mp_b, mp_n, mp_p;
+
+    //3.initialize the local & mp_int variable
+    memcpy(C3, input + 65 + C2_len, 32);
+    pC2 = new unsigned char[C2_len + 10];
+    if (NULL == pC2)
+    {
+        return ERR_MEM_ALLOC;
+    }
+    memset(pC2, 0x00, C2_len + 10);
+
+    mp_init_multi(&mp_pri_dA, &mp_x1, &mp_y1, &mp_x2, &mp_y2,
+                  &mp_Xg, &mp_Yg, &mp_a, &mp_b, &mp_n, &mp_p, NULL);
+
+    ret = mp_read_radix(&mp_a, (char *)param_a, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_b, (char *)param_b, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_n, (char *)param_n, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_p, (char *)param_p, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_Xg, (char *)Xg, 16);
+    CHECK_RET(ret);
+    ret = mp_read_radix(&mp_Yg, (char *)Yg, 16);
+    CHECK_RET(ret);
+
+    //4. check c1 if is on the curve
+    ret = BYTE_POINT_is_on_curve(input + 1, 64);
+    if (ret)
+    {
+        return ret;
+    }
+
+    //5. set c1 into (x1,y1)
+    ret = Byte2Mp_Int(&mp_pri_dA, input + 1, 32);
+    CHECK_RET(ret);
+    ret = Byte2Mp_Int(&mp_y1, input + 33, 32);
+    CHECK_RET(ret);
+
+    //6.cal [dB]C1 = [dB](x2,y2)
+    ret = Ecc_point_mul(&mp_x2, &mp_y2, &mp_x1, &mp_y1, &mp_pri_dA,
+                        &mp_a, &mp_p);
+    CHECK_RET(ret);
+
+    ret = Mp_Int2Byte(tmpX2Buff, &tmpX2Len, &mp_x2);
+    CHECK_RET(ret);
+
+    ret = Mp_Int2Byte(tmpY2Buff, &tmpY2Len, &mp_y2);
+    CHECK_RET(ret);
+
+#ifdef _DEBUG
+    printf("(x2,y2): \n");
+    printf("x2 = ");
+    BYTE_print(tmpX2Buff, tmpX2Len);
+    printf("y2 = ");
+    BYTE_print(tmpY2Buff, tmpY2Len);
+#endif //_DEBUG
+
+    //7. cal t = KDF(x2//y2,klen)
+
+    //7.1 initialize the kdf string
+    ptmp = new unsigned char[tmpX2Len * 3];
+    if (NULL == ptmp)
+    {
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+
+    memset(ptmp, 0x00, tmpX2Len * 3);
+    memcpy(ptmp, tmpX2Buff, tmpX2Len);
+    memcpy(ptmp + tmpX2Len, tmpY2Buff, tmpY2Len);
+    pout = new unsigned char[C2_len + 10];
+    if (NULL == pout)
+    {
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+    memset(pout, 0x00, C2_len + 10);
+
+    //7.2 call the function kdf
+    ret = KDF(pout, ptmp, tmpX2Len + tmpY2Len, C2_len);
+    CHECK_RET(ret);
+
+#ifdef _DEBUG
+    MP_print_Space;
+    printf("KDF t = ");
+    BYTE_print(pout, C2_len);
+#endif // _DEBUG
+
+    //7.3 check if t is zero
+    for (iter = 0; iter < C2_len; ++iter)
+    {
+        if (pout[iter] != 0)
+            break;
+    }
+    if (C2_len == iter)
+    {
+        ret = ERR_DECRYPTION_FAILED;
+        goto END;
+    }
+
+    p = pC2;
+
+    //8. set M = t^C2 to p
+    for (iter = 0; iter < C2_len; ++iter)
+    {
+        *p++ = pout[iter] ^ (*(input + 65 + iter));
+    }
+
+#ifdef _DEBUG
+    printf("M = ");
+    BYTE_print(pC2, C2_len);
+#endif //_DEBUG
+
+    //9. compute C3 = hash(x2 // M // y2)
+    if (ptmp)
+    {
+        delete[] ptmp;
+    }
+    ptmp = new unsigned char[C2_len + tmpX2Len + tmpY2Len + 100];
+    if (NULL == ptmp)
+    {
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+    memset(ptmp, 0x00, C2_len + tmpX2Len + tmpY2Len + 100);
+    memcpy(ptmp, tmpX2Buff, tmpX2Len);
+    memcpy(ptmp + tmpX2Len, pC2, C2_len);
+    memcpy(ptmp + tmpX2Len + C2_len, tmpY2Buff, tmpY2Len);
+
+    sm3(ptmp, tmpX2Len + C2_len + tmpY2Len, dgstC3);
+    if (0 != memcmp(C3, dgstC3, 32))
+    {
+        ret = ERR_DECRYPTION_FAILED;
+        goto END;
+    }
+
+    if (NULL == decData)
+    {
+        *ulDecDataLen = C2_len;
+        ret = ERR_MEM_ALLOC;
+        goto END;
+    }
+
+    if (*ulDecDataLen < C2_len)
+    {
+        *ulDecDataLen = C2_len;
+        ret = ERR_MEM_LOW;
+        goto END;
+    }
+
+    *ulDecDataLen = C2_len;
+    memcpy(decData, pC2, C2_len);
+    ret = 0;
+
+#ifdef _DEBUG
+    printf("U = ");
+    BYTE_print(dgstC3, 32);
+#endif //_DEBUG
+
+END:
+    if (ptmp)
+    {
+        delete[] ptmp;
+    }
+    if (pC2)
+    {
+        delete[] pC2;
+    }
+    if (pout)
+    {
+        delete[] pout;
+    }
+
+    mp_clear_multi(&mp_pri_dA, &mp_x1, &mp_y1, &mp_x2, &mp_y2,
+                   &mp_Xg, &mp_Yg, &mp_a, &mp_b, &mp_n, &mp_p, NULL);
+
     return ret;
 }

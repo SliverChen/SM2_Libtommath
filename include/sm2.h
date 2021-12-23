@@ -115,6 +115,11 @@ extern "C"
     */
     SM2_DLL_API int BYTE_POINT_mul(unsigned char k[32], unsigned char Point[64]);
 
+    /*
+        test for the encryption and decryption
+    */
+    SM2_DLL_API int test_GM_encryption_and_decryption();
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus
@@ -128,6 +133,26 @@ extern "C"
     @returns 0 if success, fail otherwise
 */
 int GetPrime(mp_int *m, int lon);
+
+/*
+    sm3 hash数据预处理
+    @param dgst 输出的哈希处理后的值
+    @param LenDgst 哈希处理的结果长度（一般为32）
+    @param Src 需要哈希的字符串
+    @param lenSrc 需要哈希的字符串的长度
+    @param UserID 用户id
+    @param lenUID 用户id长度
+    @param mp_a,mp_b 椭圆曲线的参数
+    @param mp_Xg,mp_Yg 椭圆曲线的基点坐标
+    @param mp_XA,mp_YA 公钥坐标
+    @returns 0 if success, fail otherwise
+*/
+int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
+                      unsigned char *Src, unsigned long lenSrc,
+                      unsigned char *UserID, unsigned long lenUID,
+                      mp_int *mp_a, mp_int *mp_b,
+                      mp_int *mp_Xg, mp_int *mp_Yg,
+                      mp_int *mp_XA, mp_int *mp_YA);
 
 /*
     sm2 generate key pair
@@ -160,13 +185,6 @@ int Ecc_point_mul(mp_int *result_x, mp_int *result_y,
 int Ecc_point_add(mp_int *result_x, mp_int *result_y,
                   mp_int *x1, mp_int *y1, mp_int *x2, mp_int *y2,
                   mp_int *param_a, mp_int *param_p);
-
-int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
-                      unsigned char *Src, unsigned long lenSrc,
-                      unsigned char *UserID, unsigned long lenUID,
-                      mp_int *mp_a, mp_int *mp_b,
-                      mp_int *mp_Xg, mp_int *mp_Yg,
-                      mp_int *mp_XA, mp_int *mp_YA);
 
 int Ecc_point_is_on_curve(mp_int *mp_X, mp_int *mp_Y,
                           mp_int *mp_a, mp_int *mp_b, mp_int *mp_p);
@@ -208,5 +226,15 @@ int Byte2Mp_Int(mp_int *mp_tar, unsigned char *src_byte, unsigned long lenSrc);
     0 if success, fail otherwise
 */
 int hexStr2unsignedStr(char *src, unsigned long lsrc, int flag, unsigned char *out, unsigned long *lout);
+
+/*
+    print the mp_int value
+*/
+int MP_printf(mp_int *mp_num);
+
+/*
+    print the BYTE value
+*/
+void BYTE_print(unsigned char *tar, unsigned long l);
 
 #endif //SM2_H

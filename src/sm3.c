@@ -16,7 +16,7 @@
 // Input:"abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd"
 // Outpuf:debe9ff9 2275b8a1 38604889 c18e5a4d 6fdb70e5 387e5765 293dcba3 9c0c5732
 
-#include "sm3.h"
+#include "../include/sm3.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"

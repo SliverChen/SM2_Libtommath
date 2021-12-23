@@ -8,7 +8,7 @@ int test_GM_encryption_and_decryption()
     unsigned char prikey[200] = {0};
     unsigned long priLen = 200;
     int ret = 0;
-    char *plain = "my name is Van, I'm an artist.";
+    char *plain = (char*)"my name is Van, I'm an artist.";
     unsigned char encData[1000] = {0};
     unsigned long encLen = 1000;
     unsigned char decData[1000] = {0};
@@ -19,12 +19,6 @@ int test_GM_encryption_and_decryption()
     //1. generate the private key
     ret = GM_GenSM2keypair(prikey, &priLen, pubkey);
     CHECK_RET(ret);
-
-    printf("public key is:\n");
-    printf("xB = ");
-    BYTE_print(pubkey, 32);
-    printf("yB = ");
-    BYTE_print(pubkey + 32, 32);
 
     //2.encrypting
     ret = GM_SM2Encrypt(encData, &encLen, (unsigned char *)plain, strlen(plain),

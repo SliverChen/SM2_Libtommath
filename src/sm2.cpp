@@ -44,7 +44,7 @@ int myrng(unsigned char *dst, int len, void *dat)
     return len;
 }
 
-int MP_printf(mp_int *mp_num)
+int MP_print(mp_int *mp_num)
 {
     char buff[1000] = {0};
     mp_toradix(mp_num, buff, 16);
@@ -137,11 +137,44 @@ END:
     return ret;
 }
 
-int Ecc_sm2_genKeypair(mp_int *mp_pridA,
+int Ecc_sm2_genKeypair(mp_int *mp_pri_dA,
                        mp_int *mp_XA, mp_int *mp_YA,
                        mp_int *mp_Xg, mp_int *mp_Yg,
                        mp_int *mp_a, mp_int *mp_b, mp_int *mp_n, mp_int *mp_p)
 {
+    int ret = 0;
+    mp_int mp_rand_k;
+
+    //generate random k --> [1,n-1]
+    ret = mp_init(&mp_rand_k);
+    CHECK_RET(ret);
+
+    ret = genRand_k(&mp_rand_k, mp_n);
+    CHECK_RET(ret);
+
+    MP_print_Space;
+    printf("random num is: ");
+    MP_print(&mp_rand_k);
+
+    //set random k into prikey
+    ret = mp_copy(&mp_rand_k, mp_pri_dA);
+    CHECK_RET(ret);
+
+    //compute public key
+    ret = Ecc_point_mul(mp_XA, mp_YA, mp_Xg, mp_Yg, &mp_rand_k,
+                        mp_a, mp_p);
+    CHECK_RET(ret);
+
+    MP_print_Space;
+    printf("public Key: \n");
+    printf("xA: ");
+    MP_print(mp_XA);
+    printf("yA: ");
+    MP_print(mp_YA);
+
+END:
+    mp_clear(&mp_rand_k);
+    return ret;
 }
 
 int Ecc_point_mul(mp_int *result_x, mp_int *result_y,
@@ -968,9 +1001,9 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
 #ifdef _DEBUG
         MP_print_Space;
         printf("x1 = ");
-        MP_printf(&mp_x1);
+        MP_print(&mp_x1);
         printf("y1 = ");
-        MP_printf(&mp_y1);
+        MP_print(&mp_y1);
 #endif //_DEBUG
 
         //7. push (x1,y1) into C1
@@ -995,9 +1028,9 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
 #ifdef _DEBUG
         MP_print_Space;
         printf("x2 = ");
-        MP_printf(&mp_x2);
+        MP_print(&mp_x2);
         printf("y2 = ");
-        MP_printf(&mp_y2);
+        MP_print(&mp_y2);
 #endif //_DEBUG
 
         //9.compute t = KDF(x2 // y2, klen)
@@ -1033,7 +1066,7 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
 #ifdef _DEBUG
         MP_print_Space;
         printf("KDF t = ");
-        BYTE_print(pout, plainLen);
+        BYTE_print(t, plainLen);
 #endif //_DEBUG
 
         //10. check if t == 0

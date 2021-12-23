@@ -1,4 +1,4 @@
-#ifndef SM2_H
+﻿#ifndef SM2_H
 #define SM2_H
 
 #ifndef SM2_DLL_API
@@ -6,6 +6,7 @@
 #endif // SM2_DLL_API
 
 #include "tommath.h"
+#pragma comment(lib, "libtommath.lib")
 
 #define SUCCESS 0
 
@@ -37,7 +38,7 @@ extern const char *Yg;
 
 #define MAX_STRLEN 256
 #define MAX_TRY_TIMES 100
-#define MP_print_Space printf("\n\n");
+#define MP_print_Space printf("\n\n")
 #define CHECK_RET(x)                                             \
     if (x != MP_OKAY)                                            \
     {                                                            \

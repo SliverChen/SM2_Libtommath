@@ -1,4 +1,4 @@
-#ifndef _____GM_DEFINE___H____
+﻿#ifndef _____GM_DEFINE___H____
 #define _____GM_DEFINE___H____
 
 #define ECC_MAX_XCOORDINATE_BITS_LEN 512 //ECC算法X座标的最大长度

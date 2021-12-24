@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "ProjectMap": {
+    "42109fee-b0b9-4fcd-9e56-2863bf8c55d2": {
+      "ProjectGuid": "42109fee-b0b9-4fcd-9e56-2863bf8c55d2",
+      "DisplayName": "libtommath",
+      "ColorIndex": 0
+    }
+  },
+  "NextColorIndex": 1
+}

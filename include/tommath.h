@@ -139,8 +139,30 @@ typedef ulong64 mp_word;
 #define MP_NEG 1  /* negative */
 
 #define MP_OKAY 0 /* ok result */
-#define MP_MEM -2 /* out of mem */
-#define MP_VAL -3 /* invalid input */
+
+//it's conflict for the value defined by own
+//set them into new error code
+#define MP_MEM -12 /* out of mem */
+#define MP_VAL -13 /* invalid input */
+
+/* error codes defined by own (defined in 12.24) */
+#define ERR_PARAM -2
+#define ERR_MEM_ALLOC -3
+#define ERR_NEED_RAND_REGEN -4
+#define ERR_MEM_LOW -5
+#define ERR_DECRYPTION_FAILED -6
+#define ERR_UNKNOWN -7
+#define ERR_GENKEY_FAILED -8
+#define ERR_INFINITE_POINT -10
+#define ERR_POINT_NOT_ON_CURVE -11
+#define ERR_SIG_VER_R_OR_S_LARGER_THAN_N 10
+#define ERR_SIG_VER_T_EQUL_ZERO 11
+#define ERR_SIG_VER_R_NOT_EQUL 12
+#define ERR_HEX2BYTE_PARAM_ERROR 13
+#define ERR_HEX2BYTE_INVALID_DATA 14
+#define ERR_HEX2BYTE_BEYOND_RANGE 15
+    /*  defined end  */
+
 #define MP_RANGE MP_VAL
 
 #define MP_YES 1 /* yes response */

@@ -11,21 +11,21 @@
 #define SM2_G_X "32C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7"
 #define SM2_G_Y "BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0"
 
-#if 0 //def _DEBUG
-const char * param_a= "787968B4FA32C3FD2417842E73BBFEFF2F3C848B6831D7E0EC65228B3937E498";
-const char * param_b= "63E4C6D3B23B0C849CF84241484BFE48F61D59A5B16BA06E6E12D1DA27C5249A";
-const char * param_n= "8542D69E4C044F18E8B92435BF6FF7DD297720630485628D5AE74EE7C32E79B7";
-const char * param_p= "8542D69E4C044F18E8B92435BF6FF7DE457283915C45517D722EDB8B08F1DFC3";
-const char * Xg     = "421DEBD61B62EAB6746434EBC3CC315E32220B3BADD50BDC4C4E6C147FEDD43D";
-const char * Yg     = "0680512BCBB42C07D47349D2153B70C4E5D7FDFCBFA36EA1A85841B9E46E09A2";
-#else
+//#if 0 //def _DEBUG
+//const char *param_a = "787968B4FA32C3FD2417842E73BBFEFF2F3C848B6831D7E0EC65228B3937E498";
+//const char *param_b = "63E4C6D3B23B0C849CF84241484BFE48F61D59A5B16BA06E6E12D1DA27C5249A";
+//const char *param_n = "8542D69E4C044F18E8B92435BF6FF7DD297720630485628D5AE74EE7C32E79B7";
+//const char *param_p = "8542D69E4C044F18E8B92435BF6FF7DE457283915C45517D722EDB8B08F1DFC3";
+//const char *Xg = "421DEBD61B62EAB6746434EBC3CC315E32220B3BADD50BDC4C4E6C147FEDD43D";
+//const char *Yg = "0680512BCBB42C07D47349D2153B70C4E5D7FDFCBFA36EA1A85841B9E46E09A2";
+//#else
 const char *param_a = SM2_A;
 const char *param_b = SM2_B;
 const char *param_n = SM2_N;
 const char *param_p = SM2_P;
 const char *Xg = SM2_G_X;
 const char *Yg = SM2_G_Y;
-#endif //_DEBUG
+//#endif //_DEBUG
 
 #include "../include/sm2.h"
 #include "../include/sm3.h"
@@ -126,7 +126,7 @@ int GM_GenSM2keypair(unsigned char *prikey, unsigned long *pulPriLen,
     if (X_len + Y_len != 64)
     {
         ret = ERR_UNKNOWN;
-        goto END;
+        CHECK_RET(ret);
     }
 
     memcpy(pubkey_XY, X, 32);
@@ -152,13 +152,13 @@ int Ecc_sm2_genKeypair(mp_int *mp_pri_dA,
     ret = genRand_k(&mp_rand_k, mp_n);
     CHECK_RET(ret);
 
-    MP_print_Space;
-    printf("random num is: ");
-    MP_print(&mp_rand_k);
-
     //set random k into prikey
     ret = mp_copy(&mp_rand_k, mp_pri_dA);
     CHECK_RET(ret);
+
+    MP_print_Space;
+    printf("prikey is: ");
+    MP_print(mp_pri_dA);
 
     //compute public key
     ret = Ecc_point_mul(mp_XA, mp_YA, mp_Xg, mp_Yg, &mp_rand_k,
@@ -642,7 +642,7 @@ int genRand_k(mp_int *rand_k, mp_int *mp_n)
     ret = mp_mul_d(rand_k, rand(), rand_k);
     CHECK_RET(ret);
 
-    ret = mp_submod(rand_k, mp_n, mp_n, rand_k);
+    ret = mp_mod(rand_k, mp_n, rand_k);
     CHECK_RET(ret);
 
 END:
@@ -686,6 +686,7 @@ int KDF(unsigned char *kdfOutBuff, unsigned char *Z_in, unsigned long ulZlen, un
             {
                 delete[] pZandCt;
             }
+            CHECK_RET_NOT_GOEND(ret);
             return ret;
         }
         pZ = pZandCt;
@@ -703,6 +704,7 @@ int KDF(unsigned char *kdfOutBuff, unsigned char *Z_in, unsigned long ulZlen, un
         {
             delete[] pZandCt;
         }
+        CHECK_RET_NOT_GOEND(ret);
         return ret;
     }
     pZ = pZandCt;
@@ -717,7 +719,7 @@ int KDF(unsigned char *kdfOutBuff, unsigned char *Z_in, unsigned long ulZlen, un
     {
         delete[] pZandCt;
     }
-
+    CHECK_RET_NOT_GOEND(ret);
     return ret;
 }
 
@@ -731,12 +733,16 @@ int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
     int ret = 0;
     if (NULL == Src || 0 == lenSrc || NULL == UserID || 0 == lenUID || 8000 < lenUID)
     {
-        return ERR_PARAM;
+        ret = ERR_PARAM;
+        CHECK_RET_NOT_GOEND(ret);
+        return ret;
     }
     if (NULL == dgst)
     {
         *LenDgst = 32;
-        return 0;
+        ret = ERR_PARAM;
+        CHECK_RET_NOT_GOEND(ret);
+        return ret;
     }
 
 #ifdef _DEBUG
@@ -787,14 +793,15 @@ int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
     tmplen = strlen(tmp);
     ret = hexStr2unsignedStr(tmp, tmplen, 0, ENTL_buf, &Len_ENTL_buf);
     if (ret)
-        goto END;
-
+    {
+        CHECK_RET(ret);
+    }
     lenZA_SRC = Len_ENTL_buf + lenUID + lenParamA + lenParamB + lenParamXg + lenParamYg + lenParamXA + lenParamYA;
     ZA_SRC_Buff = new unsigned char[lenZA_SRC + MAX_STRLEN];
     if (NULL == ZA_SRC_Buff)
     {
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
     memset(ZA_SRC_Buff, 0x00, sizeof(ZA_SRC_Buff));
     memcpy(ZA_SRC_Buff, ENTL_buf, Len_ENTL_buf);
@@ -811,7 +818,7 @@ int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
     if (NULL == pM_A)
     {
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
 #ifdef _DEBUG
     printf("...Z value is:\n");
@@ -998,6 +1005,11 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
                             &mp_a, &mp_p);
         CHECK_RET(ret);
 
+        //check if C1 is on the curve
+        ret = Ecc_point_is_on_curve(&mp_x1, &mp_y1, &mp_a, &mp_b, &mp_p);
+        CHECK_RET(ret);
+        printf("In Encryption, the C1 is on the curve\n");
+
 #ifdef _DEBUG
         MP_print_Space;
         printf("x1 = ");
@@ -1044,7 +1056,7 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
         if (NULL == ptmp)
         {
             ret = ERR_MEM_ALLOC;
-            goto END;
+            CHECK_RET(ret);
         }
         memset(ptmp, 0x00, tmpX2Len * 3);
         memcpy(ptmp, tmpX2Buff, tmpX2Len);
@@ -1055,7 +1067,7 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
         if (NULL == t)
         {
             ret = ERR_MEM_ALLOC;
-            goto END;
+            CHECK_RET(ret);
         }
         memset(t, 0x00, plainLen + 10);
 
@@ -1073,13 +1085,18 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
         for (iter = 0; iter < plainLen; ++iter)
         {
             if (t[iter] != 0)
+            {
+                printf("In encryption, the result of KDF is not zero\n");
                 break;
+            }
         }
         if (plainLen == iter)
             continue;
         else
+        {
+            printf("In encryption, the result of KDF is not zero\n");
             break;
-
+        }
     } while (1);
 
     //11. compute C2 = M ^ t
@@ -1087,7 +1104,7 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
     if (NULL == C2)
     {
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
     memset(C2, 0x00, plainLen + 10);
 
@@ -1112,7 +1129,7 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
     if (NULL == ptmp)
     {
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
     memset(ptmp, 0x00, plainLen + tmpX2Len + tmpY2Len + 100);
     memcpy(ptmp, tmpX2Buff, tmpX2Len);
@@ -1132,14 +1149,14 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
     {
         *ulEncDataLen = 32 + C2_len + C1_len;
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
 
     if (*ulEncDataLen < 32 + C2_len + C1_len)
     {
         *ulEncDataLen = 32 + C2_len + C1_len;
         ret = ERR_MEM_LOW;
-        goto END;
+        CHECK_RET(ret);
     }
 
     memcpy(encData, C1, C1_len);
@@ -1176,11 +1193,14 @@ END:
 int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned char *input, unsigned long inlen,
                   unsigned char *pri_dA, unsigned long ulPri_dALen)
 {
+    int ret = 0;
     //presume that the input data is:
     //[C1->65 Byte][C2->Unknown length][C3->32 Byte]
     if (NULL == input || 98 > inlen || NULL == pri_dA || 0 == ulPri_dALen)
     {
-        return ERR_PARAM;
+        ret = ERR_PARAM;
+        CHECK_RET_NOT_GOEND(ret);
+        return ret;
     }
 
     //1. declare the local variable
@@ -1195,7 +1215,6 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     unsigned char *ptmp = NULL;
     unsigned char *p = NULL;
     int C2_len = inlen - 65 - 32;
-    int ret = 0;
     int iter = 0;
 
     //2. declare the mp_int variable
@@ -1207,7 +1226,9 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     pC2 = new unsigned char[C2_len + 10];
     if (NULL == pC2)
     {
-        return ERR_MEM_ALLOC;
+        ret = ERR_MEM_ALLOC;
+        CHECK_RET_NOT_GOEND(ret);
+        return ret;
     }
     memset(pC2, 0x00, C2_len + 10);
 
@@ -1231,6 +1252,7 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     ret = BYTE_POINT_is_on_curve(input + 1, 64);
     if (ret)
     {
+        CHECK_RET_NOT_GOEND(ret);
         return ret;
     }
 
@@ -1266,7 +1288,7 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     if (NULL == ptmp)
     {
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
 
     memset(ptmp, 0x00, tmpX2Len * 3);
@@ -1276,7 +1298,7 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     if (NULL == pout)
     {
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
     memset(pout, 0x00, C2_len + 10);
 
@@ -1299,7 +1321,7 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     if (C2_len == iter)
     {
         ret = ERR_DECRYPTION_FAILED;
-        goto END;
+        CHECK_RET(ret);
     }
 
     p = pC2;
@@ -1324,7 +1346,7 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     if (NULL == ptmp)
     {
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
     memset(ptmp, 0x00, C2_len + tmpX2Len + tmpY2Len + 100);
     memcpy(ptmp, tmpX2Buff, tmpX2Len);
@@ -1335,21 +1357,21 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     if (0 != memcmp(C3, dgstC3, 32))
     {
         ret = ERR_DECRYPTION_FAILED;
-        goto END;
+        CHECK_RET(ret);
     }
 
     if (NULL == decData)
     {
         *ulDecDataLen = C2_len;
         ret = ERR_MEM_ALLOC;
-        goto END;
+        CHECK_RET(ret);
     }
 
     if (*ulDecDataLen < C2_len)
     {
         *ulDecDataLen = C2_len;
         ret = ERR_MEM_LOW;
-        goto END;
+        CHECK_RET(ret);
     }
 
     *ulDecDataLen = C2_len;

@@ -39,13 +39,24 @@ extern const char *Yg;
 #define MAX_STRLEN 256
 #define MAX_TRY_TIMES 100
 #define MP_print_Space printf("\n\n")
-#define CHECK_RET(x)                                             \
-    if (x != MP_OKAY)                                            \
-    {                                                            \
-        ret = x;                                                 \
-        fprintf(stderr, "%s(%d):err:%04x;desr:%s;\n",            \
-                __FILE__, __LINE__, x, mp_error_to_string(ret)); \
-        goto END;                                                \
+
+#define filename(x) strrchr(x, '\\') ? strrchr(x, '\\') + 1 : x
+
+#define CHECK_RET(x)                                                       \
+    if (x != MP_OKAY)                                                      \
+    {                                                                      \
+        ret = x;                                                           \
+        fprintf(stderr, "%s(%d):err:%d;desr:%s;\n",                        \
+                filename(__FILE__), __LINE__, x, mp_error_to_string(ret)); \
+        goto END;                                                          \
+    }
+
+#define CHECK_RET_NOT_GOEND(x)                                             \
+    if (x != MP_OKAY)                                                      \
+    {                                                                      \
+        ret = x;                                                           \
+        fprintf(stderr, "%s(%d):err:%d;desr:%s;\n",                        \
+                filename(__FILE__), __LINE__, x, mp_error_to_string(ret)); \
     }
 
 #ifdef __cplusplus

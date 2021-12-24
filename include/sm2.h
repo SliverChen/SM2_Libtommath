@@ -38,7 +38,7 @@ extern const char *Yg;
 
 #define MAX_STRLEN 256
 #define MAX_TRY_TIMES 100
-#define MP_print_Space printf("\n\n")
+#define MP_print_Space printf("\n")
 
 #define filename(x) strrchr(x, '\\') ? strrchr(x, '\\') + 1 : x
 

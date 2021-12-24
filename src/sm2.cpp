@@ -1019,16 +1019,16 @@ int GM_SM2Encrypt(unsigned char *encData, unsigned long *ulEncDataLen, unsigned 
 #endif //_DEBUG
 
         //7. push (x1,y1) into C1
-        C1[0] = 0x04;
+        C1[0] = 0x04; //pay attention to the first position, it's not the part of the (x1,y1)
         Mp_Int2Byte(tmpBuff, &ulTmpBuffLen, &mp_x1);
         memcpy(C1 + 1, tmpBuff, ulTmpBuffLen);
         Mp_Int2Byte(tmpBuff, &ulTmpBuffLen2, &mp_y1);
-        memcpy(C1 + ulTmpBuffLen, tmpBuff, ulTmpBuffLen2);
+        memcpy(C1 + ulTmpBuffLen + 1, tmpBuff, ulTmpBuffLen2);
         C1_len = 1 + ulTmpBuffLen + ulTmpBuffLen2;
 
 #ifdef _DEBUG
         MP_print_Space;
-        printf("C1 = ");
+        printf("Encrypt: C1 = ");
         BYTE_print(C1, C1_len);
 #endif //_DEBUG
 
@@ -1247,6 +1247,28 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
     CHECK_RET(ret);
     ret = mp_read_radix(&mp_Yg, (char *)Yg, 16);
     CHECK_RET(ret);
+    ret = Byte2Mp_Int(&mp_pri_dA, pri_dA, ulPri_dALen);
+    CHECK_RET(ret);
+
+#ifdef _DEBUG
+    MP_print_Space;
+    printf("Decrypt: C1 = ");
+    BYTE_print(input, 65);
+#endif //_DEBUG
+
+    //5. set c1 into (x1,y1)
+    ret = Byte2Mp_Int(&mp_x1, input + 1, 32);
+    CHECK_RET(ret);
+    ret = Byte2Mp_Int(&mp_y1, input + 33, 32);
+    CHECK_RET(ret);
+
+#ifdef _DEBUG
+    MP_print_Space;
+    printf("x1 is: ");
+    MP_print(&mp_x1);
+    printf("y1 is: ");
+    MP_print(&mp_y1);
+#endif //_DEBUG
 
     //4. check c1 if is on the curve
     ret = BYTE_POINT_is_on_curve(input + 1, 64);
@@ -1255,12 +1277,6 @@ int GM_SM2Decrypt(unsigned char *decData, unsigned long *ulDecDataLen, unsigned 
         CHECK_RET_NOT_GOEND(ret);
         return ret;
     }
-
-    //5. set c1 into (x1,y1)
-    ret = Byte2Mp_Int(&mp_pri_dA, input + 1, 32);
-    CHECK_RET(ret);
-    ret = Byte2Mp_Int(&mp_y1, input + 33, 32);
-    CHECK_RET(ret);
 
     //6.cal [dB]C1 = [dB](x2,y2)
     ret = Ecc_point_mul(&mp_x2, &mp_y2, &mp_x1, &mp_y1, &mp_pri_dA,

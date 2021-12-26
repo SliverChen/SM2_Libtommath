@@ -6,7 +6,10 @@
 #endif // SM2_DLL_API
 
 #include "tommath.h"
+#include "../3rdPart/include/openssl/bn.h"
 #pragma comment(lib, "libtommath.lib")
+#pragma comment(lib, "libcrypto.lib")
+#pragma comment(lib, "libssl.lib")
 
 #define SUCCESS 0
 
@@ -71,7 +74,7 @@ extern "C"
     @param pubkey_XY 生成的公钥（32 byte）
     @returns 0 if success, fail otherwise
 */
-    SM2_DLL_API int GM_GenSM2keypair(unsigned char *prikey, unsigned long *pulPriLen,
+    SM2_DLL_API int GM_GenSM2keypair(unsigned char *d1, unsigned char *d2, unsigned long *pulPriLen,
                                      unsigned char pubkey_XY[64]);
 
     /*
@@ -175,7 +178,7 @@ int Sm3WithPreprocess(unsigned char *dgst, unsigned long *LenDgst,
     @param mp_p 椭圆曲线有限域下的模
     @returns 0 if success, fail otherwise
 */
-int Ecc_sm2_genKeypair(mp_int *mp_pridA,
+int Ecc_sm2_genKeypair(mp_int *mp_pri_d1, mp_int *mp_pri_d2,
                        mp_int *mp_XA, mp_int *mp_YA,
                        mp_int *mp_Xg, mp_int *mp_Yg,
                        mp_int *mp_a, mp_int *mp_b, mp_int *mp_n, mp_int *mp_p);
@@ -194,10 +197,40 @@ int Ecc_point_mul(mp_int *result_x, mp_int *result_y,
                   mp_int *d,
                   mp_int *param_a, mp_int *param_p);
 
+/*
+    calculate point addition：C = A + B
+    @param (result_x,result_y) 结果C的点坐标
+    @param (x1,y1) 点A的坐标
+    @param (x2,y2) 点B的坐标
+    @param param_a 椭圆曲线的参数a
+    @param param_p 有限域的模
+    @returns 0 if success, fail otherwise
+*/
 int Ecc_point_add(mp_int *result_x, mp_int *result_y,
                   mp_int *x1, mp_int *y1, mp_int *x2, mp_int *y2,
                   mp_int *param_a, mp_int *param_p);
 
+/*
+    calculate point subtraction: C = A - B
+    @param (result_x,result_y) 结果C的点坐标
+    @param (x1,y1) 点A的坐标
+    @param (x2,y2) 点B的坐标
+    @param param_a 椭圆曲线的参数a
+    @param param_p 有限域的模
+    @returns 0 if success, fail otherwise
+*/
+int Ecc_point_sub(mp_int *result_x, mp_int *result_y,
+                  mp_int *x1, mp_int *y1, mp_int *x2, mp_int *y2,
+                  mp_int *param_a, mp_int *param_p);
+
+/*
+    check point if is on curve
+    @param (mp_X,mp_Y) 需要检验的点坐标
+    @param mp_a 椭圆曲线的参数a
+    @param mp_b 椭圆曲线的参数b
+    @param mp_p 有限域的模
+    @returns 0 if is on curve, not on curve otherwise
+*/
 int Ecc_point_is_on_curve(mp_int *mp_X, mp_int *mp_Y,
                           mp_int *mp_a, mp_int *mp_b, mp_int *mp_p);
 

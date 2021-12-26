@@ -83,17 +83,19 @@ int GetPrime(mp_int *m, int lon)
     return ret;
 }
 
-int GM_GenSM2keypair(unsigned char *prikey, unsigned long *pulPriLen,
+int GM_GenSM2keypair(unsigned char *d1, unsigned char *d2, unsigned long *pulPriLen,
                      unsigned char pubkey_XY[64])
 {
-    if (NULL == prikey || *pulPriLen < 32)
+    if (NULL == d1 || NULL == d2 || *pulPriLen < 32)
     {
         return ERR_PARAM;
     }
 
     int ret = 0;
-    mp_int mp_a, mp_b, mp_n, mp_p, mp_Xg, mp_Yg, mp_pri_dA, mp_XA, mp_YA;
-    mp_init_multi(&mp_a, &mp_b, &mp_n, &mp_p, &mp_Xg, &mp_Yg, &mp_pri_dA, &mp_XA, &mp_YA, NULL);
+    mp_int mp_a, mp_b, mp_n, mp_p, mp_Xg, mp_Yg,
+        mp_pri_d1, mp_pri_d2, mp_XA, mp_YA;
+    mp_init_multi(&mp_a, &mp_b, &mp_n, &mp_p, &mp_Xg, &mp_Yg,
+                  &mp_pri_d1, &mp_pri_d2, &mp_XA, &mp_YA, NULL);
     unsigned char X[100] = {0};
     unsigned long X_len = 100;
     unsigned char Y[100] = {0};
@@ -111,10 +113,13 @@ int GM_GenSM2keypair(unsigned char *prikey, unsigned long *pulPriLen,
     ret = mp_read_radix(&mp_Yg, (char *)Yg, 16);
     CHECK_RET(ret);
 
-    ret = Ecc_sm2_genKeypair(&mp_pri_dA, &mp_XA, &mp_YA, &mp_Xg, &mp_Yg, &mp_a, &mp_b, &mp_n, &mp_p);
+    ret = Ecc_sm2_genKeypair(&mp_pri_d1, &mp_pri_d2, &mp_XA, &mp_YA, &mp_Xg, &mp_Yg, &mp_a, &mp_b, &mp_n, &mp_p);
     CHECK_RET(ret);
 
-    ret = Mp_Int2Byte(prikey, pulPriLen, &mp_pri_dA);
+    ret = Mp_Int2Byte(d1, pulPriLen, &mp_pri_d1);
+    CHECK_RET(ret);
+
+    ret = Mp_Int2Byte(d2, pulPriLen, &mp_pri_d2);
     CHECK_RET(ret);
 
     ret = Mp_Int2Byte(X, &X_len, &mp_XA);
@@ -133,44 +138,90 @@ int GM_GenSM2keypair(unsigned char *prikey, unsigned long *pulPriLen,
     memcpy(pubkey_XY + 32, Y, 32);
 
 END:
-    mp_clear_multi(&mp_a, &mp_b, &mp_n, &mp_p, &mp_Xg, &mp_Yg, &mp_pri_dA, &mp_XA, &mp_YA, NULL);
+    mp_clear_multi(&mp_a, &mp_b, &mp_n, &mp_p, &mp_Xg, &mp_Yg,
+                   &mp_pri_d1, &mp_pri_d2, &mp_XA, &mp_YA, NULL);
     return ret;
 }
 
-int Ecc_sm2_genKeypair(mp_int *mp_pri_dA,
+int Ecc_sm2_genKeypair(mp_int *mp_pri_d1, mp_int *mp_pri_d2,
                        mp_int *mp_XA, mp_int *mp_YA,
                        mp_int *mp_Xg, mp_int *mp_Yg,
                        mp_int *mp_a, mp_int *mp_b, mp_int *mp_n, mp_int *mp_p)
 {
     int ret = 0;
-    mp_int mp_rand_k;
+    mp_int mp_rand_k, mp_d1d2_1, mp_d1d2, XA_new, YA_new, one;
 
-    //generate random k --> [1,n-1]
-    ret = mp_init(&mp_rand_k);
+    //initialize the mp_int value
+    ret = mp_init_multi(&mp_rand_k, &mp_d1d2, &mp_d1d2_1, &one, &XA_new, &YA_new, NULL);
     CHECK_RET(ret);
 
+    //set random k into d1
     ret = genRand_k(&mp_rand_k, mp_n);
     CHECK_RET(ret);
-
-    //set random k into prikey
-    ret = mp_copy(&mp_rand_k, mp_pri_dA);
+    ret = mp_copy(&mp_rand_k, mp_pri_d1);
     CHECK_RET(ret);
 
-    MP_print_Space;
-    printf("prikey is: ");
-    MP_print(mp_pri_dA);
+    //set random k into d2
+    ret = genRand_k(&mp_rand_k, mp_n);
+    CHECK_RET(ret);
+    ret = mp_copy(&mp_rand_k, mp_pri_d2);
+    CHECK_RET(ret);
 
-    //compute public key
-    ret = Ecc_point_mul(mp_XA, mp_YA, mp_Xg, mp_Yg, &mp_rand_k,
+    printf("d1 is: ");
+    MP_print(mp_pri_d1);
+
+    printf("d2 is: ");
+    MP_print(mp_pri_d2);
+
+    //compute the true value of (d1d2-1)
+    ret = mp_mulmod(mp_pri_d1, mp_pri_d2, mp_p, &mp_d1d2);
+    CHECK_RET(ret);
+
+    mp_set(&one, 1);
+
+    ret = mp_submod(&mp_d1d2, &one, mp_p, &mp_d1d2_1);
+    CHECK_RET(ret);
+
+    printf("d1d2-1 is: ");
+    MP_print(&mp_d1d2_1);
+
+    //compute public key by using (d1d2-1)G
+    ret = Ecc_point_mul(mp_XA, mp_YA, mp_Xg, mp_Yg, &mp_d1d2_1,
                         mp_a, mp_p);
     CHECK_RET(ret);
 
-    MP_print_Space;
-    printf("public Key: \n");
+    //check if public key is on the curve
+    ret = Ecc_point_is_on_curve(mp_XA, mp_YA, mp_a, mp_b, mp_p);
+    CHECK_RET(ret);
+
+    printf("public Key(using (d1d2-1)G): \n");
     printf("xA: ");
     MP_print(mp_XA);
     printf("yA: ");
     MP_print(mp_YA);
+
+    //compute public key by using d1d2G - G
+
+    //compute d1d2G
+    ret = Ecc_point_mul(&XA_new, &YA_new, mp_Xg, mp_Yg, mp_pri_d2,
+                        mp_a, mp_p);
+    CHECK_RET(ret);
+    ret = Ecc_point_mul(&XA_new, &YA_new, &XA_new, &YA_new, mp_pri_d1,
+                        mp_a, mp_p);
+    CHECK_RET(ret);
+
+    //compute d1d2G - G
+    //经过测试发现这种计算方式得到的结果点是不在曲线上的
+    //说明这种计算会出现问题
+    ret = Ecc_point_sub(&XA_new, &YA_new, &XA_new, &YA_new, mp_Xg, mp_Yg,
+                        mp_a, mp_p);
+    CHECK_RET(ret);
+
+    printf("\npublic key(using d2Gd1 - G): \n");
+    printf("xA: ");
+    MP_print(&XA_new);
+    printf("yA: ");
+    MP_print(&YA_new);
 
 END:
     mp_clear(&mp_rand_k);
@@ -214,34 +265,30 @@ int Ecc_point_mul(mp_int *result_x, mp_int *result_y,
     CHECK_RET(ret);
     Bt_array_len = strlen(Bt_array);
 
-    for (i = 0; i <= Bt_array_len - 1; ++i)
+    for (i = 0; i <= Bt_array_len - 1; i++)
     {
-        ret = Ecc_point_add(&tmp_Qx, &tmp_Qy,
-                            &mp_Qx, &mp_Qy, &mp_Qx, &mp_Qy, &mp_A, &mp_P);
+        // Q = [2]Q;
+        ret = Ecc_point_add(&tmp_Qx, &tmp_Qy, &mp_Qx, &mp_Qy, &mp_Qx, &mp_Qy, &mp_A, &mp_P);
         CHECK_RET(ret);
-
-        if ('1' == Bt_array[i])
-        {
-            ret = Ecc_point_add(&mp_Qx, &mp_Qy,
-                                &tmp_Qx, &tmp_Qy, px, py, &mp_A, &mp_P);
+        /////////////
+        if ('1' == Bt_array[i]) //为什么1的时候额外加一次
+        {                       // Q = Q + P
+            ret = Ecc_point_add(&mp_Qx, &mp_Qy, &tmp_Qx, &tmp_Qy, px, py, &mp_A, &mp_P);
             CHECK_RET(ret);
-
+            /////////////
             ret = mp_copy(&mp_Qx, &tmp_Qx);
             CHECK_RET(ret);
-
             ret = mp_copy(&mp_Qy, &tmp_Qy);
             CHECK_RET(ret);
         }
         ret = mp_copy(&tmp_Qx, &mp_Qx);
         CHECK_RET(ret);
-
         ret = mp_copy(&tmp_Qy, &mp_Qy);
         CHECK_RET(ret);
     }
 
     ret = mp_copy(&tmp_Qx, result_x);
     CHECK_RET(ret);
-
     ret = mp_copy(&tmp_Qy, result_y);
     CHECK_RET(ret);
 
@@ -387,6 +434,57 @@ int Ecc_point_add(mp_int *result_x, mp_int *result_y,
 
 END:
     mp_clear_multi(&tmp1, &tmp2, &Lambda, &mp_tmp_r, NULL);
+    return ret;
+}
+
+int Ecc_point_sub(mp_int *result_x, mp_int *result_y,
+                  mp_int *x1, mp_int *y1, mp_int *x2, mp_int *y2,
+                  mp_int *param_a, mp_int *param_p)
+{
+    int ret;
+    mp_int y2_new;
+    ret = mp_init(&y2_new);
+    CHECK_RET(ret);
+
+    if ((MP_EQ == mp_cmp_d(x1, 0) && MP_EQ == mp_cmp_d(y1, 0)) &&
+        (MP_EQ == mp_cmp_d(x2, 0) && MP_EQ == mp_cmp_d(y2, 0)))
+    {
+        mp_zero(result_x);
+        mp_zero(result_y);
+        return SUCCESS;
+    }
+
+    if (MP_EQ == mp_cmp_d(x1, 0) && MP_EQ == mp_cmp_d(y1, 0))
+    {
+        ret = mp_copy(x2, result_x);
+        CHECK_RET(ret);
+
+        ret = mp_copy(y2, result_y);
+        CHECK_RET(ret);
+        return SUCCESS;
+    }
+
+    if (MP_EQ == mp_cmp_d(x2, 0) && MP_EQ == mp_cmp_d(y2, 0))
+    {
+        ret = mp_copy(x1, result_x);
+        CHECK_RET(ret);
+
+        ret = mp_copy(y1, result_y);
+        CHECK_RET(ret);
+
+        return SUCCESS;
+    }
+
+    //y2_new = p - y2
+    ret = mp_sub(param_p, y2, &y2_new);
+    CHECK_RET(ret);
+
+    // cal (x1,y1) + (x2,y2_new)
+    ret = Ecc_point_add(result_x, result_y, x1, y1, x2, &y2_new,
+                        param_a, param_p);
+    CHECK_RET(ret);
+END:
+    mp_clear(&y2_new);
     return ret;
 }
 
@@ -630,22 +728,38 @@ int Byte2Mp_Int(mp_int *mp_tar, unsigned char *src_byte, unsigned long lenSrc)
 int genRand_k(mp_int *rand_k, mp_int *mp_n)
 {
     int ret = 0;
-    srand((unsigned)time(NULL));
-    mp_set(rand_k, 1);
+    BIGNUM *bn_randk = BN_new();
+    BIGNUM *bn_curven = BN_new();
+    BYTE bin_curven[65];
+    BYTE bin_randk[65];
+    unsigned long len;
 
-    ret = mp_mul_d(rand_k, rand(), rand_k);
+    ret = Mp_Int2Byte(bin_curven, &len, mp_n);
     CHECK_RET(ret);
 
-    ret = mp_mul_d(rand_k, rand(), rand_k);
-    CHECK_RET(ret);
+    BN_bin2bn(bin_curven, len, bn_curven);
 
-    ret = mp_mul_d(rand_k, rand(), rand_k);
-    CHECK_RET(ret);
+    do
+    {
+        ret = BN_rand_range(bn_randk, bn_curven);
 
-    ret = mp_mod(rand_k, mp_n, rand_k);
+    } while (BN_is_zero(bn_randk));
+
+    BN_bn2bin(bn_randk, bin_randk);
+
+    printf("the random number is: ");
+    for (int i = 0; i < 32; ++i)
+    {
+        printf("%02X", bin_randk[i]);
+    }
+    printf("\n");
+
+    ret = Byte2Mp_Int(rand_k, bin_randk, len);
     CHECK_RET(ret);
 
 END:
+    BN_free(bn_randk);
+    BN_free(bn_curven);
     return ret;
 }
 
